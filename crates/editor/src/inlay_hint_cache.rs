@@ -20,7 +20,7 @@ use anyhow::Context as _;
 use clock::Global;
 use futures::future;
 use gpui::{AsyncApp, Context, Entity, Task, Window};
-use language::{language_settings::InlayHintKind, Buffer, BufferSnapshot};
+use language::{language_settings::InlayHintKind, Buffer, BufferSnapshot, LanguageName};
 use parking_lot::RwLock;
 use project::{InlayHint, ResolveState};
 
@@ -29,7 +29,17 @@ use language::language_settings::InlayHintSettings;
 use smol::lock::Semaphore;
 use sum_tree::Bias;
 use text::{BufferId, ToOffset, ToPoint};
+use ui::App;
 use util::{post_inc, ResultExt};
+
+#[derive(Default, Clone)]
+pub struct InlayHintToggle(HashMap<LanguageName, bool>);
+
+impl gpui::Global for InlayHintToggle {}
+
+pub fn init(cx: &mut App) {
+    cx.set_global(InlayHintToggle::default());
+}
 
 pub struct InlayHintCache {
     hints: HashMap<ExcerptId, Arc<RwLock<CachedExcerptHints>>>,
@@ -300,7 +310,7 @@ impl InlayHintCache {
         self.invalidate_debounce = debounce_value(new_hint_settings.edit_debounce_ms);
         self.append_debounce = debounce_value(new_hint_settings.scroll_debounce_ms);
         let new_allowed_hint_kinds = new_hint_settings.enabled_inlay_hint_kinds();
-        match (old_enabled, self.enabled) {
+        match dbg!(old_enabled, self.enabled) {
             (false, false) => {
                 self.allowed_hint_kinds = new_allowed_hint_kinds;
                 ControlFlow::Break(None)
