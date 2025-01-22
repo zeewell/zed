@@ -6,6 +6,7 @@ use collections::{HashMap, HashSet};
 use git2::BranchType;
 use gpui::SharedString;
 use parking_lot::Mutex;
+use regex::Regex;
 use rope::Rope;
 use std::borrow::Borrow;
 use std::sync::LazyLock;
@@ -24,6 +25,12 @@ pub struct Branch {
     pub name: SharedString,
     /// Timestamp of most recent commit, normalized to Unix Epoch format.
     pub unix_timestamp: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RepositoryStats {
+    pub insertions: u32,
+    pub deletions: u32,
 }
 
 pub trait GitRepository: Send + Sync {
@@ -63,6 +70,8 @@ pub trait GitRepository: Send + Sync {
     fn unstage_paths(&self, paths: &[RepoPath]) -> Result<()>;
 
     fn commit(&self, message: &str) -> Result<()>;
+
+    fn repository_stats(&self) -> Result<RepositoryStats>;
 }
 
 impl std::fmt::Debug for dyn GitRepository {
@@ -300,6 +309,51 @@ impl GitRepository for RealGitRepository {
         }
         Ok(())
     }
+
+    fn repository_stats(&self) -> Result<RepositoryStats> {
+        let working_directory = self
+            .repository
+            .lock()
+            .workdir()
+            .context("failed to read git work directory")?
+            .to_path_buf();
+
+        let cmd = new_std_command(&self.git_binary_path)
+            .current_dir(&working_directory)
+            .args(["diff", "--shortstat"])
+            .output()?;
+        let stdout = String::from_utf8_lossy(&cmd.stdout);
+        let stdout = stdout.trim();
+        if !cmd.status.success() {
+            let stderr = String::from_utf8_lossy(&cmd.stderr);
+            return Err(anyhow!(
+                "Failed to get repository stats. Stdout: '{stdout}', Stderr: '{stderr}'"
+            ));
+        }
+
+        static GIT_STATS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                r"(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?",
+            )
+            .unwrap()
+        });
+        let Some(capture) = GIT_STATS_REGEX.captures(stdout) else {
+            return Ok(RepositoryStats::default());
+        };
+
+        let insertions = capture
+            .get(2)
+            .map(|m| m.as_str().parse::<u32>())
+            .unwrap_or(Ok(0))?;
+        let deletions = capture
+            .get(3)
+            .map(|m| m.as_str().parse::<u32>())
+            .unwrap_or(Ok(0))?;
+        Ok(RepositoryStats {
+            insertions,
+            deletions,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -446,6 +500,10 @@ impl GitRepository for FakeGitRepository {
 
     fn commit(&self, _message: &str) -> Result<()> {
         unimplemented!()
+    }
+
+    fn repository_stats(&self) -> Result<RepositoryStats> {
+        Ok(RepositoryStats::default())
     }
 }
 

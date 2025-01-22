@@ -1,13 +1,13 @@
 use crate::git_panel_settings::StatusStyle;
 use crate::{git_panel_settings::GitPanelSettings, git_status_icon};
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use db::kvp::KEY_VALUE_STORE;
 use editor::actions::MoveToEnd;
 use editor::scroll::ScrollbarAutoHide;
 use editor::{Editor, EditorMode, EditorSettings, MultiBuffer, ShowScrollbar};
 use futures::channel::mpsc;
 use futures::StreamExt as _;
-use git::repository::RepoPath;
+use git::repository::{RepoPath, RepositoryStats};
 use git::status::FileStatus;
 use git::{CommitAllChanges, CommitChanges, RevertAll, StageAll, ToggleStaged, UnstageAll};
 use gpui::*;
@@ -17,7 +17,10 @@ use project::{Fs, Project, ProjectPath};
 use serde::{Deserialize, Serialize};
 use settings::Settings as _;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{collections::HashSet, ops::Range, path::PathBuf, sync::Arc, time::Duration, usize};
+use std::{
+    collections::HashSet, fmt::Write as _, ops::Range, path::PathBuf, sync::Arc, time::Duration,
+    usize,
+};
 use theme::ThemeSettings;
 use ui::{
     prelude::*, Checkbox, Divider, DividerColor, ElevationIndex, Scrollbar, ScrollbarState, Tooltip,
@@ -97,6 +100,7 @@ pub struct GitPanel {
     all_staged: Option<bool>,
     width: Option<Pixels>,
     err_sender: mpsc::Sender<anyhow::Error>,
+    repository_stats: Option<RepositoryStats>,
 }
 
 fn commit_message_editor(
@@ -177,6 +181,9 @@ impl GitPanel {
                         if let Some(this) = handle.upgrade() {
                             this.update(&mut cx, |this, cx| {
                                 this.update_visible_entries(cx);
+                                this.update_repo_stats()
+                                    .context("Git panel update")
+                                    .log_err();
                                 let active_repository = this.active_repository.as_ref();
                                 this.commit_editor =
                                     cx.new_view(|cx| commit_message_editor(active_repository, cx));
@@ -210,6 +217,7 @@ impl GitPanel {
                 selected_entry: None,
                 show_scrollbar: false,
                 hide_scrollbar_task: None,
+                repository_stats: None,
                 active_repository,
                 scroll_handle,
                 fs,
@@ -773,6 +781,13 @@ impl GitPanel {
             workspace.show_toast(toast, cx);
         });
     }
+
+    pub fn update_repo_stats(&mut self) -> Result<()> {
+        if let Some(active_repository) = &self.active_repository {
+            self.repository_stats = Some(active_repository.repository_stats()?);
+        }
+        Ok(())
+    }
 }
 
 // GitPanel –– Render
@@ -806,11 +821,25 @@ impl GitPanel {
             .as_ref()
             .map_or(0, RepositoryHandle::entry_count);
 
-        let changes_string = match entry_count {
+        let mut changes_string = match entry_count {
             0 => "No changes".to_string(),
             1 => "1 change".to_string(),
-            n => format!("{} changes", n),
+            n => format!("{n} changes"),
         };
+        if let Some(stats) = &self.repository_stats {
+            if stats.deletions > 0 && stats.insertions > 0 {
+                write!(
+                    &mut changes_string,
+                    " (+{}/-{})",
+                    stats.insertions, stats.deletions
+                )
+                .unwrap();
+            } else if stats.deletions > 0 {
+                write!(&mut changes_string, " (-{})", stats.deletions).unwrap();
+            } else if stats.insertions > 0 {
+                write!(&mut changes_string, " (+{})", stats.insertions).unwrap();
+            }
+        }
 
         // for our use case treat None as false
         let all_staged = self.all_staged.unwrap_or(false);

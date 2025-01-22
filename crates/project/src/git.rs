@@ -3,6 +3,7 @@ use crate::{Project, ProjectPath};
 use anyhow::anyhow;
 use futures::channel::mpsc;
 use futures::{SinkExt as _, StreamExt as _};
+use git::repository::RepositoryStats;
 use git::{
     repository::{GitRepository, RepoPath},
     status::{GitSummary, TrackedSummary},
@@ -357,5 +358,9 @@ impl RepositoryHandle {
             commit_message.set_text("", cx);
         });
         Ok(())
+    }
+
+    pub fn repository_stats(&self) -> anyhow::Result<RepositoryStats> {
+        self.git_repo.repository_stats()
     }
 }
