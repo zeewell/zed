@@ -1,6 +1,6 @@
 use super::{
     wrap_map::{self, WrapEdit, WrapPoint, WrapSnapshot},
-    Highlights,
+    DisplayPoint, Highlights,
 };
 use crate::{EditorStyle, GutterDimensions};
 use collections::{Bound, HashMap, HashSet};
@@ -1590,17 +1590,22 @@ impl BlockSnapshot {
         }
     }
 
-    pub(super) fn is_block_line(&self, row: BlockRow) -> bool {
+    pub fn is_block_line(&self, row: BlockRow) -> bool {
         let mut cursor = self.transforms.cursor::<(BlockRow, WrapRow)>(&());
         cursor.seek(&row, Bias::Right, &());
         cursor.item().map_or(false, |t| t.block.is_some())
     }
 
-    pub(super) fn is_line_replaced(&self, row: MultiBufferRow) -> bool {
+    pub fn is_block_line_2(&self, row: u32) -> bool {
+        self.is_block_line(BlockRow(row))
+    }
+
+    pub fn is_line_replaced(&self, row: MultiBufferRow) -> bool {
         let wrap_point = self
             .wrap_snapshot
             .make_wrap_point(Point::new(row.0, 0), Bias::Left);
         let mut cursor = self.transforms.cursor::<(WrapRow, BlockRow)>(&());
+        wrap_point.row();
         cursor.seek(&WrapRow(wrap_point.row()), Bias::Right, &());
         cursor.item().map_or(false, |transform| {
             transform

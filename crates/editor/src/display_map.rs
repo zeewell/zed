@@ -689,7 +689,7 @@ pub struct DisplaySnapshot {
     inlay_snapshot: InlaySnapshot,
     tab_snapshot: TabSnapshot,
     wrap_snapshot: WrapSnapshot,
-    block_snapshot: BlockSnapshot,
+    pub block_snapshot: BlockSnapshot,
     text_highlights: TextHighlights,
     inlay_highlights: InlayHighlights,
     clip_at_line_ends: bool,

@@ -1,5 +1,5 @@
 use editor::{
-    display_map::{DisplayRow, DisplaySnapshot, FoldPoint, ToDisplayPoint},
+    display_map::{DisplayRow, DisplaySnapshot, FoldPoint, InlayPoint, ToDisplayPoint},
     movement::{
         self, find_boundary, find_preceding_boundary_display_point, FindRange, TextLayoutDetails,
     },
@@ -1329,11 +1329,25 @@ pub(crate) fn start_of_relative_buffer_row(
 
 fn up_down_buffer_rows(
     map: &DisplaySnapshot,
-    point: DisplayPoint,
+    mut point: DisplayPoint,
     mut goal: SelectionGoal,
-    times: isize,
+    mut times: isize,
     text_layout_details: &TextLayoutDetails,
 ) -> (DisplayPoint, SelectionGoal) {
+    while map.block_snapshot.is_block_line_2(point.row().0) {
+        dbg!("here!");
+        if times > 0 {
+            (point, goal) = movement::down(map, point, goal, true, text_layout_details);
+            times -= 1;
+        } else if times < 0 {
+            (point, goal) = movement::up(map, point, goal, true, text_layout_details);
+            times += 1;
+        } else {
+            break;
+        }
+    }
+    dbg!(point, goal);
+
     let bias = if times < 0 { Bias::Left } else { Bias::Right };
     let start = map.display_point_to_fold_point(point, Bias::Left);
     let begin_folded_line = map.fold_point_to_display_point(
@@ -1381,6 +1395,7 @@ fn up_down_buffer_rows(
     } else {
         map.line_len(begin_folded_line.row())
     };
+    dbg!(new_col);
 
     (
         map.clip_point(DisplayPoint::new(begin_folded_line.row(), new_col), bias),
