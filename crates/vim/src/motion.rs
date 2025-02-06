@@ -2759,10 +2759,15 @@ mod test {
         state::Mode,
         test::{NeovimBackedTestContext, VimTestContext},
     };
-    use editor::display_map::Inlay;
+    use editor::{
+        actions::{MoveToBeginning, ToggleFold},
+        display_map::{DisplayRow, Inlay},
+        DisplayPoint, Editor, EditorMode, MultiBuffer,
+    };
     use indoc::indoc;
     use language::Point;
     use multi_buffer::MultiBufferRow;
+    use ui::VisualContext as _;
 
     #[gpui::test]
     async fn test_start_end_of_paragraph(cx: &mut gpui::TestAppContext) {
@@ -3484,5 +3489,74 @@ mod test {
         "},
             Mode::Normal,
         );
+    }
+
+    #[gpui::test]
+    async fn test_multi_buffer_folding(cx: &mut gpui::TestAppContext) {
+        let mut cx = VimTestContext::new(cx, true).await;
+        cx.set_state(
+            indoc! {"
+            ˇstruct Foo {
+
+            }
+        "},
+            Mode::Normal,
+        );
+        cx.editor = cx.new_window_entity(|window, cx| {
+            Editor::new(
+                EditorMode::Full,
+                MultiBuffer::build_multi(
+                    [
+                        ("111\n222\n333", vec![Point::new(0, 0)..Point::new(3, 0)]),
+                        ("444\n555\n666", vec![Point::new(0, 0)..Point::new(3, 0)]),
+                    ],
+                    cx,
+                ),
+                None,
+                false,
+                window,
+                cx,
+            )
+        });
+
+        cx.update_editor(|editor, window, cx| {
+            editor.move_to_beginning(&MoveToBeginning, window, cx);
+        });
+
+        cx.update_editor(|editor, _, cx| {
+            assert_eq!(
+                "\n\n111\n222\n333\n\n\n444\n555\n666",
+                editor.display_text(cx)
+            );
+            assert_eq!(
+                editor.selections.display_ranges(cx),
+                vec![DisplayPoint::new(DisplayRow(2), 0)..DisplayPoint::new(DisplayRow(2), 0)],
+                "We're in the first row after 2 rows of buffer header displayed"
+            );
+        });
+
+        cx.update_editor(|editor, window, cx| {
+            editor.toggle_fold(&ToggleFold, window, cx);
+        });
+        cx.update_editor(|editor, _, cx| {
+            assert_eq!("\n\n\n\n444\n555\n666", editor.display_text(cx));
+            assert_eq!(
+                editor.selections.display_ranges(cx),
+                vec![DisplayPoint::new(DisplayRow(0), 0)..DisplayPoint::new(DisplayRow(0), 0)],
+                "We're within the header, header is folded and has 1 row exactly"
+            );
+        });
+
+        cx.simulate_keystroke("j");
+        cx.simulate_keystroke("j");
+
+        cx.update_editor(|editor, _, cx| {
+            assert_eq!("\n\n\n\n444\n555\n666", editor.display_text(cx));
+            assert_eq!(
+                editor.selections.display_ranges(cx),
+                vec![DisplayPoint::new(DisplayRow(5), 0)..DisplayPoint::new(DisplayRow(5), 0)],
+                "We're past 2 headers (1 folded and 1 not folded), 2 rows each, on the first line after that"
+            );
+        });
     }
 }
