@@ -263,6 +263,11 @@ jobs:
           mkdir -p ${{ env.CARGO_HOME }} -ErrorAction Ignore
           cp ./.cargo/ci-config.toml ${{ env.CARGO_HOME }}/config.toml
 
+      - name: Run rustup update
+        working-directory: ${{ env.ZED_WORKSPACE }}
+        # Windows can't run shell scripts, so we need to use `cargo xtask`.
+        run: rustup update
+
       - name: cargo clippy
         working-directory: ${{ env.ZED_WORKSPACE }}
         # Windows can't run shell scripts, so we need to use `cargo xtask`.
