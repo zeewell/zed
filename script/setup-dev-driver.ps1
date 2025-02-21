@@ -4,7 +4,7 @@
 # Ref: https://learn.microsoft.com/en-us/windows/dev-drive/
 
 # Currently, total CI requires almost 45GB of space, here we are creating a 100GB drive.
-$Volume = New-VHD -Path C:/zed_dev_drive.vhdx -SizeBytes 100GB |
+$Volume = New-VHD -Path C:\zed_dev_drive.vhdx -SizeBytes 100GB |
                     Mount-VHD -Passthru |
                     Initialize-Disk -Passthru |
                     New-Partition -AssignDriveLetter -UseMaximumSize |
@@ -17,17 +17,17 @@ Write-Output $Volume
 Write-Output "Using Dev Drive at $Drive"
 
 # Move Cargo to the dev drive
-New-Item -Path "$($Drive)/.cargo/bin" -ItemType Directory -Force
-Copy-Item -Path "C:/Users/runneradmin/.cargo/*" -Destination "$($Drive)/.cargo/" -Recurse -Force
+New-Item -Path "$($Drive)\.cargo\bin" -ItemType Directory -Force
+Copy-Item -Path "C:\Users\runneradmin\.cargo\*" -Destination "$($Drive)\.cargo\" -Recurse -Force
 
 # Move rustup to the dev drive
-New-Item -Path "$($Drive)/.rustup" -ItemType Directory -Force
-Copy-Item -Path "C:/Users/runneradmin/.rustup/*" -Destination "$($Drive)/.rustup/" -Recurse -Force
+New-Item -Path "$($Drive)\.rustup" -ItemType Directory -Force
+Copy-Item -Path "C:\Users\runneradmin\.rustup\*" -Destination "$($Drive)\.rustup\" -Recurse -Force
 
 Write-Output `
 	"DEV_DRIVE=$($Drive)" `
-	"RUSTUP_HOME=$($Drive)/.rustup" `
-	"CARGO_HOME=$($Drive)/.cargo" `
-	"ZED_WORKSPACE=$($Drive)/zed" `
-	"PATH=$($Drive)/.cargo/bin;$env:PATH" `
+	"RUSTUP_HOME=$($Drive)\.rustup" `
+	"CARGO_HOME=$($Drive)\.cargo" `
+	"ZED_WORKSPACE=$($Drive)\zed" `
+	"PATH=$($Drive)\.cargo\bin;$env:PATH" `
 	>> $env:GITHUB_ENV
