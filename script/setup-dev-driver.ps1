@@ -20,6 +20,10 @@ Write-Output "Using Dev Drive at $Drive"
 New-Item -Path "$($Drive)/.cargo/bin" -ItemType Directory -Force
 Copy-Item -Path "C:/Users/runneradmin/.cargo/*" -Destination "$($Drive)/.cargo/" -Recurse -Force
 
+# Move rustup to the dev drive
+New-Item -Path "$($Drive)/.rustup" -ItemType Directory -Force
+Copy-Item -Path "C:/Users/runneradmin/.rustup/*" -Destination "$($Drive)/.rustup/" -Recurse -Force
+
 Write-Output `
 	"DEV_DRIVE=$($Drive)" `
 	"RUSTUP_HOME=$($Drive)/.rustup" `
