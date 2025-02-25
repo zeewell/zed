@@ -3019,7 +3019,7 @@ impl LocalSnapshot {
         // TODO - optimize, knowing that removed_entries are sorted.
         removed_entries.retain(|id| updated_entries.binary_search_by_key(id, |e| e.id).is_err());
 
-        proto::UpdateWorktree {
+        dbg!(proto::UpdateWorktree {
             project_id,
             worktree_id,
             abs_path: self.abs_path().to_proto(),
@@ -3030,7 +3030,7 @@ impl LocalSnapshot {
             is_last_update: self.completed_scan_id == self.scan_id,
             updated_repositories,
             removed_repositories,
-        }
+        })
     }
 
     fn insert_entry(&mut self, mut entry: Entry, fs: &dyn Fs) -> Entry {
@@ -3431,6 +3431,7 @@ impl BackgroundScannerState {
         fs: &dyn Fs,
         watcher: &dyn Watcher,
     ) -> Option<LocalRepositoryEntry> {
+        dbg!("inserting git repo");
         let work_dir_path: Arc<Path> = match dot_git_path.parent() {
             Some(parent_dir) => {
                 // Guard against repositories inside the repository metadata
@@ -4326,6 +4327,7 @@ impl BackgroundScanner {
                 break;
             }
         }
+        dbg!(&containing_git_repository);
 
         let (scan_job_tx, scan_job_rx) = channel::unbounded();
         {
@@ -4464,6 +4466,7 @@ impl BackgroundScanner {
     }
 
     async fn process_events(&self, mut abs_paths: Vec<PathBuf>) {
+        dbg!(&abs_paths);
         let root_path = self.state.lock().snapshot.abs_path.clone();
         let root_canonical_path = match self.fs.canonicalize(root_path.as_path()).await {
             Ok(path) => SanitizedPath::from(path),
@@ -4742,6 +4745,7 @@ impl BackgroundScanner {
     }
 
     async fn scan_dir(&self, scans_running: &Arc<AtomicU32>, job: &ScanJob) -> Result<()> {
+        dbg!(&job);
         let root_abs_path;
         let root_char_bag;
         {
@@ -4786,6 +4790,7 @@ impl BackgroundScanner {
             let child_abs_path: Arc<Path> = child_abs_path.into();
             let child_name = child_abs_path.file_name().unwrap();
             let child_path: Arc<Path> = job.path.join(child_name).into();
+            dbg!(&child_path);
 
             if child_name == *DOT_GIT {
                 {
@@ -4796,9 +4801,12 @@ impl BackgroundScanner {
                         self.watcher.as_ref(),
                     );
                     if let Some(local_repo) = repo {
+                        dbg!("scannering");
                         scans_running.fetch_add(1, atomic::Ordering::Release);
                         git_status_update_jobs
                             .push(self.schedule_git_statuses_update(&mut state, local_repo));
+                    } else {
+                        dbg!("nope rope");
                     }
                 }
             } else if child_name == *GITIGNORE {
@@ -5449,9 +5457,10 @@ impl BackgroundScanner {
                     .status(&[git::WORK_DIRECTORY_REPO_PATH.clone()])
                     .log_err()
                 else {
+                    dbg!("WAT");
                     return;
                 };
-
+                dbg!(&statuses.entries);
                 log::trace!(
                     "computed git statuses for repo {repository_name} in {:?}",
                     t0.elapsed()
@@ -5468,6 +5477,7 @@ impl BackgroundScanner {
                     )
                     .log_err()
                 else {
+                    dbg!("FYUPLS");
                     return;
                 };
 
@@ -5478,6 +5488,7 @@ impl BackgroundScanner {
 
                 let mut new_entries_by_path = SumTree::new(&());
                 for (repo_path, status) in statuses.entries.iter() {
+                    dbg!(&repo_path, status);
                     let project_path = repository.work_directory.unrelativize(repo_path);
 
                     new_entries_by_path.insert_or_replace(

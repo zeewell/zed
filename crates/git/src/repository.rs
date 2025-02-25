@@ -807,6 +807,7 @@ impl GitRepository for FakeGitRepository {
 
     fn status(&self, path_prefixes: &[RepoPath]) -> Result<GitStatus> {
         let state = self.state.lock();
+        dbg!(&path_prefixes, &state.statuses);
 
         let mut entries = state
             .statuses
